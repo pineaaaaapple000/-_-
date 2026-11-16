@@ -125,32 +125,9 @@ function joyEnd(e){if(e.pointerId===joyID){joyID=null;joy={x:0,y:0};nub.style.le
 stick.onpointerup=joyEnd;stick.onpointercancel=joyEnd;
 let lookID=null;
 let lastX=0,lastY=0;
-
- window.addEventListener("pointerdown",e=>{
- if(!playing)return;
- if(e.clientX<W*.38)return;
- if(e.target.closest("button"))return;
- lookID=e.pointerId;
- lastX=e.clientX;
- lastY=e.clientY;
-});
-
-window.addEventListener("pointermove",e=>{
- if(e.pointerId!==lookID)return;
-
- const dx=e.clientX-lastX;
- const dy=e.clientY-lastY;
-
- player.a+=dx*.0045;
-
- lastX=e.clientX;
- lastY=e.clientY;
-});
-
-function lookEnd(e){
- if(e.pointerId===lookID)lookID=null;
-}
-
+window.addEventListener("pointerdown",e=>{if(!playing)return;if(e.clientX<W*.38)return;if(e.target.closest("button"))return;lookID=e.pointerId;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener("pointermove",e=>{if(e.pointerId!==lookID)return;const dx=e.clientX-lastX;const dy=e.clientY-lastY;player.a+=dx*.0045;lastX=e.clientX;lastY=e.clientY;});
+function lookEnd(e){if(e.pointerId===lookID)lookID=null;}
 window.addEventListener("pointerup",lookEnd);
 window.addEventListener("pointercancel",lookEnd);
 let keys={};onkeydown=e=>{keys[e.key.toLowerCase()]=true};onkeyup=e=>keys[e.key.toLowerCase()]=false;
