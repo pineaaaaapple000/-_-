@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>INFECTION PROTOCOL</title>
+<style>
+*{box-sizing:border-box;touch-action:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050a10;color:white;font-family:Arial,sans-serif}
+canvas{position:absolute;width:100%;height:100%;display:block}
+#hud{position:absolute;inset:0;pointer-events:none}
+.top{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between}
+.panel{background:#07131be8;border:1px solid #345b6a;padding:8px 12px;border-radius:9px;font-size:12px}
+.panel b{display:block;color:#5df4ff;font-size:19px;margin-top:3px}
+#center{position:absolute;top:12%;width:100%;text-align:center;font-weight:bold;text-shadow:0 2px 5px black}
+#cross{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%)}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 5px #00eaff}
+#cross:before{width:2px;height:18px;left:8px}
+#cross:after{height:2px;width:18px;top:8px}
+#bottom{position:absolute;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:end}
+#stats{display:flex;gap:6px}
+.stat{background:#07131be8;border:1px solid #345b6a;border-radius:8px;padding:8px;font-size:11px}
+.stat b{display:block;font-size:18px;color:#aaffaa}
+#stick{width:110px;height:110px;border:2px solid #648a9b;background:#16303caa;border-radius:50%;position:relative;pointer-events:auto}
+#nub{width:44px;height:44px;border-radius:50%;background:#9beeffbb;border:2px solid white;position:absolute;left:31px;top:31px}
+#buttons{display:grid;grid-template-columns:58px 68px;gap:7px;pointer-events:auto}
+button{color:white;background:#122b39dd;border:1px solid #73a2b2;font-weight:bold}
+.btn{width:58px;height:58px;border-radius:50%;font-size:11px}
+#fire{width:68px;height:68px;background:#921e3be8;border-color:#ff8aa5;font-size:14px}
+#reload,#jump{height:36px;border-radius:9px}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(#132c39,#03070c);padding:20px}
+.card{max-width:500px;width:100%;background:#07131bf5;border:1px solid #387487;border-radius:18px;padding:25px}
+h1{font-size:38px;margin:0;letter-spacing:2px}
+h1 span{color:#ff5275}
+p{font-size:13px;line-height:1.8;color:#b9dbe4}
+#start{width:100%;padding:15px;border:0;border-radius:9px;background:#48dce9;color:#031116;font-size:16px;font-weight:bold}
+#toast{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);background:#07131bee;border:1px solid #61f1ff;padding:12px;border-radius:10px;opacity:0}
+@media(max-height:500px){#stick{width:85px;height:85px}#nub{left:20px;top:20px}#buttons{grid-template-columns:50px 60px}.btn{width:50px;height:50px}#fire{width:60px;height:60px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+ <div class="top">
+  <div class="panel">WAVE<b id="wave">01</b></div>
+  <div class="panel">ZOMBIES<b id="left">07</b></div>
+  <div class="panel">AMMO<b id="ammo">30 / 90</b></div>
+ </div>
+ <div id="center">INFECTION PROTOCOL</div>
+ <div id="cross"></div>
+ <div id="bottom">
+  <div id="stats">
+   <div class="stat">HP<b id="hp">100</b></div>
+   <div class="stat">ARMOR<b id="armor">50</b></div>
+   <div class="stat">KILLS<b id="kills">0</b></div>
+  </div>
+  <div style="display:flex;align-items:end;gap:10px">
+   <div id="stick"><div id="nub"></div></div>
+   <div id="buttons">
+    <button class="btn" id="jump">JUMP</button>
+    <button class="btn" id="fire">FIRE</button>
+    <button id="reload">RELOAD</button>
+    <button class="btn" id="grenade">G-NADE</button>
+   </div>
+  </div>
+ </div>
+ <div id="toast"></div>
+</div>
+<div id="overlay">
+ <div class="card">
+  <h1>INFECTION<br><span>PROTOCOL</span></h1>
+  <p>CSO風スマホFPS / SURVIVAL MODE<br><br>
+  左スティック：移動<br>
+  画面右側スワイプ：視点移動<br>
+  FIRE：射撃 / 長押し連射<br>
+  RELOAD：リロード / JUMP：ジャンプ<br>
+  G-NADE：グレネード<br><br>
+  人間Botは安全地帯を守り、ゾンビは集団で襲ってくる。<br>横画面推奨。</p>
+  <button id="start">DEPLOY / ゲーム開始</button>
+ </div>
+</div>
+<script>
+(()=>{
+"use strict";
+const c=document.querySelector("#c"),ctx=c.getContext("2d");
+const $=id=>document.getElementById(id);
+let W,H,playing=false,last=0,clock=0;
+function resize(){W=innerWidth;H=innerHeight;c.width=W*devicePixelRatio;c.height=H*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+resize();onresize=resize;
+const N=24;
+let map=Array.from({length:N},(_,y)=>Array.from({length:N},(_,x)=>x===0||y===0||x===N-1||y===N-1?1:0));
+for(let y=3;y<20;y++)if(y<8||y>15){map[y][7]=1;map[y][16]=1}
+for(let x=3;x<21;x++)if(x<9||x>15){map[5][x]=1;map[18][x]=1}
+[[4,4],[5,4],[18,4],[19,4],[4,19],[5,19],[18,19],[19,19],[10,3],[13,20],[3,11],[20,12]].forEach(([x,y])=>map[y][x]=1);
+const player={x:12,y:13,a:-Math.PI/2};
+let zombies=[],bots=[],particles=[],round=1,kills=0,hp=100,armor=50,ammo=30,reserve=90,grenades=2;
+let joy={x:0,y:0},joyID=null,lookID=null,lastX=0,fireHeld=false,fireCD=0,reloadTime=0,shot=0,flash=0,hit=0,jump=0;
+const FOV=Math.PI/3;
+const wall=(x,y)=>map[Math.floor(y)]?.[Math.floor(x)]!==0;
+function free(x,y,r=.22){return !wall(x-r,y-r)&&!wall(x+r,y-r)&&!wall(x-r,y+r)&&!wall(x+r,y+r)}
+function move(o,dx,dy,r=.22){if(free(o.x+dx,o.y,r))o.x+=dx;if(free(o.x,o.y+dy,r))o.y+=dy}
+function spawnBots(){bots=[];for(let i=0;i<5;i++)bots.push({x:11.2+i%3*.7,y:11.2+Math.floor(i/3)*.7,hp:100,alive:true,cd:Math.random()})}
+function spawnWave(){zombies=[];for(let i=0;i<5+round*2;i++){let p={x:2,y:2};for(let j=0;j<100;j++){let a=Math.random()*Math.PI*2,r=8+Math.random()*3;p={x:player.x+Math.cos(a)*r,y:player.y+Math.sin(a)*r};if(free(p.x,p.y,.3))break}zombies.push({...p,hp:70+round*10,speed:.55+Math.random()*.2,alive:true,attack:Math.random(),stun:0,skin:i%4})}}
+function reset(){round=1;kills=0;hp=100;armor=50;ammo=30;reserve=90;grenades=2;player.x=12;player.y=13;player.a=-Math.PI/2;spawnBots();spawnWave();hud()}
+function hud(){$("hp").textContent=Math.ceil(hp);$("armor").textContent=Math.ceil(armor);$("kills").textContent=kills;$("ammo").textContent=ammo+" / "+reserve;$("wave").textContent=String(round).padStart(2,"0");$("left").textContent=zombies.filter(z=>z.alive).length}
+function toast(s){$("toast").textContent=s;$("toast").style.opacity=1;setTimeout(()=>$("toast").style.opacity=0,1000)}
+function blocked(x,y,tx,ty){let d=Math.hypot(tx-x,ty-y),n=Math.ceil(d*10);for(let i=1;i<n;i++){let t=i/n;if(wall(x+(tx-x)*t,y+(ty-y)*t))return true}return false}
+function reload(){if(reloadTime||ammo===30||reserve<=0)return;reloadTime=1.25;toast("RELOADING")}
+$("reload").onclick=reload;
+$("jump").onclick=()=>jump=.4;
+$("fire").onpointerdown=e=>{e.preventDefault();fireHeld=true;shoot();$("fire").setPointerCapture(e.pointerId)};
+$("fire").onpointerup=()=>fireHeld=false;$("fire").onpointercancel=()=>fireHeld=false;
+function shoot(){if(!playing||reloadTime||fireCD>0)return;if(ammo<=0)return reload();ammo--;fireCD=.13;shot=.09;
+let target=null,best=10;
+for(let z of zombies){if(!z.alive)continue;let dx=z.x-player.x,dy=z.y-player.y,d=Math.hypot(dx,dy),a=Math.atan2(dy,dx)-player.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)<.11+d*.006&&d<best&&!blocked(player.x,player.y,z.x,z.y)){target=z;best=d}}
+if(target){target.hp-=35;target.stun=.15;hit=.12;if(target.hp<=0){target.alive=false;kills++;toast("ZOMBIE ELIMINATED")}}
+hud()}
+$("grenade").onclick=()=>{if(grenades<=0)return toast("NO GRENADE");grenades--;let x=player.x+Math.cos(player.a)*4,y=player.y+Math.sin(player.a)*4;particles.push({x,y,t:.7,boom:true});toast("GRENADE!");hud()};
+const stick=$("stick"),nub=$("nub");
+stick.onpointerdown=e=>{joyID=e.pointerId;stick.setPointerCapture(e.pointerId);joyMove(e)};
+stick.onpointermove=e=>{if(e.pointerId===joyID)joyMove(e)};
+function joyMove(e){let r=stick.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,m=Math.min(1,Math.hypot(dx,dy)/(r.width*.35)),a=Math.atan2(dy,dx);joy.x=Math.cos(a)*m;joy.y=Math.sin(a)*m;nub.style.left=(r.width/2-22+joy.x*r.width*.28)+"px";nub.style.top=(r.height/2-22+joy.y*r.height*.28)+"px"}
+function joyEnd(e){if(e.pointerId===joyID){joyID=null;joy={x:0,y:0};nub.style.left="";nub.style.top=""}}
+stick.onpointerup=joyEnd;stick.onpointercancel=joyEnd;
+c.onpointerdown=e=>{if(e.clientX<W*.42)return;lookID=e.pointerId;lastX=e.clientX;c.setPointerCapture(e.pointerId)};
+c.onpointermove=e=>{if(e.pointerId===lookID){player.a+=(e.clientX-lastX)*.006;lastX=e.clientX}};
+c.onpointerup=e=>{if(e.pointerId===lookID)lookID=null};c.onpointercancel=()=>lookID=null;
+let keys={};onkeydown=e=>{keys[e.key.toLowerCase()]=true};onkeyup=e=>keys[e.key.toLowerCase()]=false;
+function update(dt){clock+=dt;fireCD=Math.max(0,fireCD-dt);shot=Math.max(0,shot-dt);flash=Math.max(0,flash-dt);hit=Math.max(0,hit-dt);jump=Math.max(0,jump-dt);if(fireHeld)shoot();
+if(reloadTime>0){reloadTime-=dt;if(reloadTime<=0){let n=Math.min(30-ammo,reserve);ammo+=n;reserve-=n;hud()}}
+let f=-joy.y+(keys.w?1:0)-(keys.s?1:0),s=joy.x+(keys.d?1:0)-(keys.a?1:0),v=2.7*dt;
+move(player,Math.cos(player.a)*f*v-Math.sin(player.a)*s*v,Math.sin(player.a)*f*v+Math.cos(player.a)*s*v,.23);
+for(let b of bots){if(!b.alive)continue;let d=Math.hypot(12-b.x,12-b.y);if(d>.8)move(b,(12-b.x)/d*dt*.7,(12-b.y)/d*dt*.7);b.cd-=dt;if(b.cd<=0){b.cd=.7+Math.random()*.4;let z=zombies.find(z=>z.alive&&Math.hypot(z.x-b.x,z.y-b.y)<6);if(z&&!blocked(b.x,b.y,z.x,z.y)){z.hp-=12;if(z.hp<=0){z.alive=false;kills++}}}}
+for(let z of zombies){if(!z.alive)continue;if(z.stun>0){z.stun-=dt;continue}
+let target=player,near=bots.filter(b=>b.alive).sort((a,b)=>Math.hypot(z.x-a.x,z.y-a.y)-Math.hypot(z.x-b.x,z.y-b.y))[0];if(near&&Math.hypot(z.x-near.x,z.y-near.y)<2.5)target=near;
+let dx=target.x-z.x,dy=target.y-z.y,d=Math.hypot(dx,dy);if(d>.55)move(z,dx/d*z.speed*dt,dy/d*z.speed*dt);else{z.attack-=dt;if(z.attack<=0){z.attack=.8;if(target===player){let dmg=8,abs=Math.min(armor,dmg*.6);armor-=abs;hp-=dmg-abs;flash=.2;if(hp<=0){hp=0;playing=false;$("overlay").style.display="flex";$("start").textContent="RETRY / 再挑戦";$("overlay").querySelector("h1").innerHTML="MISSION <span>FAILED</span>"}}else target.hp-=10}}}
+for(let p of particles){p.t-=dt;if(p.boom){for(let z of zombies)if(z.alive&&Math.hypot(z.x-p.x,z.y-p.y)<4){z.hp-=100;if(z.hp<=0){z.alive=false;kills++}}p.boom=false}}
+particles=particles.filter(p=>p.t>0);
+if(zombies.every(z=>!z.alive)){round++;spawnWave();toast("WAVE "+round+" INCOMING")}
+hud()}
+function ray(a){let d=0;for(let i=0;i<700;i++){d+=.035;if(wall(player.x+Math.cos(a)*d,player.y+Math.sin(a)*d))break}return d}
+function render(){ctx.clearRect(0,0,W,H);
+let sky=ctx.createLinearGradient(0,0,0,H/2);sky.addColorStop(0,"#07111b");sky.addColorStop(1,"#243b44");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H/2);
+let fl=ctx.createLinearGradient(0,H/2,0,H);fl.addColorStop(0,"#26383c");fl.addColorStop(1,"#080c10");ctx.fillStyle=fl;ctx.fillRect(0,H/2,W,H/2);
+let strips=Math.min(500,Math.ceil(W/2)),sw=W/strips,depth=[];
+for(let i=0;i<strips;i++){let a=player.a-FOV/2+i/strips*FOV,d=ray(a)*Math.cos(a-player.a);depth[i]=d;let h=Math.min(H*2,H/(d+.08)),y=H/2-h/2,shade=Math.max(20,155-d*10);ctx.fillStyle=`rgb(${shade*.5|0},${shade*.8|0},${shade|0})`;ctx.fillRect(i*sw,y,sw+1,h);ctx.fillStyle="#aaffff12";ctx.fillRect(i*sw,y,sw+1,2)}
+let ss=[];zombies.filter(z=>z.alive).forEach(z=>ss.push({...z,type:1}));bots.filter(b=>b.alive).forEach(b=>ss.push({...b,type:0}));ss.sort((a,b)=>Math.hypot(b.x-player.x,b.y-player.y)-Math.hypot(a.x-player.x,a.y-player.y));
+for(let s of ss){let dx=s.x-player.x,dy=s.y-player.y,d=Math.hypot(dx,dy),a=Math.atan2(dy,dx)-player.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)>FOV*.7||d<.2)continue;let sx=(.5+a/FOV)*W,sz=Math.min(H*.7,H/(d+.2)*.7),sy=H/2-sz*.45;if(depth[Math.floor(sx/sw)]<d)continue;
+ctx.save();ctx.translate(sx,sy);ctx.shadowBlur=12;ctx.shadowColor=s.type?"#7bff8d":"#39d8ff";ctx.fillStyle=s.type?["#72bc78","#9bce82","#438f6a","#a1d17c"][s.skin]:"#448ab5";ctx.beginPath();ctx.ellipse(0,sz*.45,sz*.22,sz*.32,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=s.type?"#c9ffb9":"#b9efff";ctx.beginPath();ctx.arc(0,0,sz*.18,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle="#123";ctx.fillRect(-sz*.1,-sz*.04,sz*.06,sz*.04);ctx.fillRect(sz*.04,-sz*.04,sz*.06,sz*.04);if(s.type){ctx.fillStyle="#111";ctx.fillRect(-sz*.25,sz*.78,sz*.5,4);ctx.fillStyle="#8fff91";ctx.fillRect(-sz*.25,sz*.78,sz*.5*Math.max(0,s.hp/(70+round*10)),4)}ctx.restore()}
+ctx.save();ctx.translate(W*.73,H*.82);ctx.rotate(-.08+Math.sin(clock*18)*shot*2);ctx.fillStyle="#101b23";ctx.strokeStyle="#718b99";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-W*.08,H*.2);ctx.lineTo(-W*.06,-H*.08);ctx.lineTo(W*.06,-H*.1);ctx.lineTo(W*.1,H*.2);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle="#2b4350";ctx.fillRect(-W*.035,-H*.13,W*.07,H*.12);if(shot>0){ctx.fillStyle="#fff7ae";ctx.beginPath();ctx.moveTo(0,-H*.17);ctx.lineTo(-W*.04,-H*.27);ctx.lineTo(W*.04,-H*.27);ctx.fill()}ctx.restore();
+if(flash>0){ctx.fillStyle=`rgba(255,20,45,${flash*1.5})`;ctx.fillRect(0,0,W,H)}$("cross").style.opacity=hit>0?1:.7}
+function loop(t){if(!playing)return;let dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);render();requestAnimationFrame(loop)}
+$("start").onclick=()=>{reset();playing=true;$("overlay").style.display="none";last=performance.now();requestAnimationFrame(loop)};
+render();
+})();
+</script>
+</body>
+</html>
