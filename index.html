@@ -22,8 +22,8 @@ canvas{position:absolute;width:100%;height:100%;display:block}
 #stats{display:flex;gap:6px}
 .stat{background:#07131be8;border:1px solid #345b6a;border-radius:8px;padding:8px;font-size:11px}
 .stat b{display:block;font-size:18px;color:#aaffaa}
-#stick{width:110px;height:110px;border:2px solid #648a9b;background:#16303caa;border-radius:50%;position:relative;pointer-events:auto}
-#nub{width:44px;height:44px;border-radius:50%;background:#9beeffbb;border:2px solid white;position:absolute;left:31px;top:31px}
+#stick{width:120px;height:120px;border:2px solid #648a9b;background:#16303caa;border-radius:50%;position:fixed;left:20px;bottom:20px;pointer-events:auto;z-index:20;}
+#nub{width:48px;height:48px;border-radius:50%;background:#9beeffbb;border:2px solid white;position:absolute;left:34px;top:34px;}
 #buttons{display:grid;grid-template-columns:58px 68px;gap:7px;pointer-events:auto}
 button{color:white;background:#122b39dd;border:1px solid #73a2b2;font-weight:bold}
 .btn{width:58px;height:58px;border-radius:50%;font-size:11px}
@@ -123,9 +123,36 @@ stick.onpointermove=e=>{if(e.pointerId===joyID)joyMove(e)};
 function joyMove(e){let r=stick.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,m=Math.min(1,Math.hypot(dx,dy)/(r.width*.35)),a=Math.atan2(dy,dx);joy.x=Math.cos(a)*m;joy.y=Math.sin(a)*m;nub.style.left=(r.width/2-22+joy.x*r.width*.28)+"px";nub.style.top=(r.height/2-22+joy.y*r.height*.28)+"px"}
 function joyEnd(e){if(e.pointerId===joyID){joyID=null;joy={x:0,y:0};nub.style.left="";nub.style.top=""}}
 stick.onpointerup=joyEnd;stick.onpointercancel=joyEnd;
-c.onpointerdown=e=>{if(e.clientX<W*.42)return;lookID=e.pointerId;lastX=e.clientX;c.setPointerCapture(e.pointerId)};
-c.onpointermove=e=>{if(e.pointerId===lookID){player.a+=(e.clientX-lastX)*.006;lastX=e.clientX}};
-c.onpointerup=e=>{if(e.pointerId===lookID)lookID=null};c.onpointercancel=()=>lookID=null;
+let lookID=null;
+let lastX=0,lastY=0;
+
+ window.addEventListener("pointerdown",e=>{
+ if(!playing)return;
+ if(e.clientX<W*.38)return;
+ if(e.target.closest("button"))return;
+ lookID=e.pointerId;
+ lastX=e.clientX;
+ lastY=e.clientY;
+});
+
+window.addEventListener("pointermove",e=>{
+ if(e.pointerId!==lookID)return;
+
+ const dx=e.clientX-lastX;
+ const dy=e.clientY-lastY;
+
+ player.a+=dx*.0045;
+
+ lastX=e.clientX;
+ lastY=e.clientY;
+});
+
+function lookEnd(e){
+ if(e.pointerId===lookID)lookID=null;
+}
+
+window.addEventListener("pointerup",lookEnd);
+window.addEventListener("pointercancel",lookEnd);
 let keys={};onkeydown=e=>{keys[e.key.toLowerCase()]=true};onkeyup=e=>keys[e.key.toLowerCase()]=false;
 function update(dt){clock+=dt;fireCD=Math.max(0,fireCD-dt);shot=Math.max(0,shot-dt);flash=Math.max(0,flash-dt);hit=Math.max(0,hit-dt);jump=Math.max(0,jump-dt);if(fireHeld)shoot();
 if(reloadTime>0){reloadTime-=dt;if(reloadTime<=0){let n=Math.min(30-ammo,reserve);ammo+=n;reserve-=n;hud()}}
